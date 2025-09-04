@@ -708,5 +708,61 @@
       if(e.key==='Enter'){ e.preventDefault(); authenticate(); }
     });
   </script>
+
+  <!-- HOTFIX: evita el aviso de “recuperar contenido” en Excel -->
+<script>
+(function(){
+  // Helper: calcula la última fila realmente usada en las columnas mapeadas
+  function getLastUsedRowInCols(ws, colIdxArray, startRow){
+    const maxRow = ws.rowCount || (startRow - 1);
+    for (let r = maxRow; r >= startRow; r--) {
+      for (const c of colIdxArray) {
+        const v = ws.getCell(r, c).value;
+        if (v !== null && v !== undefined && String(v).trim?.() !== '') {
+          return r;
+        }
+      }
+    }
+    return startRow - 1;
+  }
+
+  // Sobrescribe la función con limpieza mínima y escritura compatible con Excel para Mac
+  window.generateWithTemplateExcelJS = async function(data, templateFile, outName){
+    const buf = await templateFile.arrayBuffer();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const ws = wb.worksheets[0];
+
+    const result = findHeaderMappingExcelJS(ws, BLUEX_COLUMNS);
+    if(!result) throw new Error('No se encontraron cabeceras esperadas en la plantilla.');
+
+    const { headerRowNumber, columnMapping } = result;
+    const startRow = headerRowNumber + 1;
+    const mappedCols = Object.values(columnMapping);
+
+    // Limpieza SUAVE: solo el rango actualmente usado (no 20k filas)
+    const lastUsed = getLastUsedRowInCols(ws, mappedCols, startRow);
+    if (lastUsed >= startRow) {
+      for (let r = startRow; r <= lastUsed; r++) {
+        for (const c of mappedCols) ws.getCell(r, c).value = null; // borra valor, preserva estilos
+      }
+    }
+
+    // Escribir registros
+    data.forEach((record, i)=>{
+      const r = startRow + i;
+      for (const [colName, val] of Object.entries(record)) {
+        const c = columnMapping[colName];
+        if (c !== undefined) ws.getCell(r, c).value = (val === '' ? null : val);
+      }
+    });
+
+    // Opciones “seguras” para Excel (especialmente en macOS)
+    const outBuffer = await wb.xlsx.writeBuffer({ useSharedStrings: true, useStyles: true });
+    triggerDownload(outBuffer, outName);
+  };
+})();
+</script>
+
 </body>
 </html>
