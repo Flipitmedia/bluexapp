@@ -241,9 +241,29 @@
         }
         
         .file-input-label.has-file {
-            background: #d4edda;
+            background: linear-gradient(135deg, #d4edda 0%, #c8e6c9 100%);
             border-color: var(--success);
             color: #155724;
+            border-style: solid;
+            border-width: 3px;
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+        }
+        
+        .file-input-label.has-file .file-icon {
+            color: var(--success);
+            animation: bounce 0.6s ease-out;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+        
+        .file-input-label.has-file strong {
+            font-size: 1.1em;
+            text-decoration: underline;
         }
         
         .file-icon {
@@ -734,7 +754,7 @@
     
     <script>
         // Configuración de seguridad
-        const ACCESS_PASSWORD = 'bluex-2024-secure'; // CAMBIAR ESTA CONTRASEÑA
+        const ACCESS_PASSWORD = 'bluex'; // CAMBIAR ESTA CONTRASEÑA
         const SESSION_KEY = 'bluex_session_active';
         
         // Configuración global
