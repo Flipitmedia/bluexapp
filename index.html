@@ -1,1392 +1,712 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="robots" content="noindex, nofollow">
-    <title>Bluex Automator - Herramienta de Conversión</title>
-    <meta name="description" content="Convierte exportaciones de Shopify al formato de carga masiva de Bluexpress">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
-    
-    <!-- Librerías externas -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
-    
-    <style>
-        :root {
-            --primary: #1e3c72;
-            --secondary: #2a5298;
-            --success: #28a745;
-            --danger: #dc3545;
-            --warning: #ffc107;
-            --light: #f8f9fa;
-            --dark: #333;
-            --border: #e9ecef;
-            --border-radius: 8px;
-            --shadow: 0 4px 6px rgba(0,0,0,0.1);
-            --transition: all 0.3s ease;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            min-height: 100vh;
-            color: var(--dark);
-            line-height: 1.6;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .app-wrapper {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-            animation: fadeIn 0.6s ease-out;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
-            padding: 40px;
-            text-align: center;
-            position: relative;
-        }
-        
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
-        }
-        
-        .header-content {
-            position: relative;
-            z-index: 1;
-        }
-        
-        .header h1 {
-            font-size: 3rem;
-            font-weight: 300;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        
-        .header p {
-            font-size: 1.2rem;
-            opacity: 0.9;
-            margin-bottom: 20px;
-        }
-        
-        .version-badge {
-            display: inline-block;
-            background: rgba(255,255,255,0.2);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-        
-        .main-content {
-            padding: 40px;
-        }
-        
-        .auth-section {
-            max-width: 400px;
-            margin: 0 auto 40px;
-            text-align: center;
-        }
-        
-        .auth-section.hidden {
-            display: none;
-        }
-        
-        .auth-form {
-            background: var(--light);
-            padding: 30px;
-            border-radius: var(--border-radius);
-            border: 2px solid var(--border);
-        }
-        
-        .auth-form h3 {
-            color: var(--primary);
-            margin-bottom: 20px;
-            font-size: 1.5rem;
-        }
-        
-        .app-section {
-            display: none;
-        }
-        
-        .app-section.active {
-            display: block;
-            animation: slideIn 0.4s ease-out;
-        }
-        
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        
-        .section {
-            background: var(--light);
-            margin-bottom: 30px;
-            padding: 30px;
-            border-radius: var(--border-radius);
-            border-left: 4px solid var(--primary);
-            box-shadow: var(--shadow);
-            transition: var(--transition);
-        }
-        
-        .section:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
-        }
-        
-        .section h3 {
-            color: var(--primary);
-            margin-bottom: 20px;
-            font-size: 1.4rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            align-items: end;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: var(--dark);
-            font-size: 0.95rem;
-        }
-        
-        input, select, textarea {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid var(--border);
-            border-radius: var(--border-radius);
-            font-size: 14px;
-            font-family: inherit;
-            transition: var(--transition);
-            background: white;
-        }
-        
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1);
-        }
-        
-        .file-input-wrapper {
-            position: relative;
-            display: block;
-        }
-        
-        .file-input {
-            position: absolute;
-            left: -9999px;
-            opacity: 0;
-        }
-        
-        .file-input-label {
-            display: block;
-            padding: 20px;
-            background: white;
-            border: 2px dashed var(--border);
-            border-radius: var(--border-radius);
-            text-align: center;
-            cursor: pointer;
-            transition: var(--transition);
-            min-height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            gap: 8px;
-        }
-        
-        .file-input-label:hover {
-            background: var(--light);
-            border-color: var(--primary);
-            transform: translateY(-1px);
-        }
-        
-        .file-input-label.has-file {
-            background: #d4edda;
-            border-color: var(--success);
-            color: #155724;
-        }
-        
-        .file-icon {
-            font-size: 2rem;
-            opacity: 0.6;
-        }
-        
-        .checkbox-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin: 20px 0;
-            padding: 15px;
-            background: white;
-            border-radius: var(--border-radius);
-            border: 1px solid var(--border);
-        }
-        
-        .checkbox-wrapper input[type="checkbox"] {
-            width: auto;
-            margin: 0;
-            transform: scale(1.2);
-        }
-        
-        .checkbox-wrapper label {
-            margin: 0;
-            cursor: pointer;
-        }
-        
-        textarea {
-            resize: vertical;
-            min-height: 120px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 13px;
-        }
-        
-        .btn {
-            padding: 15px 30px;
-            border: none;
-            border-radius: var(--border-radius);
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: inherit;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-        
-        .btn:hover::before {
-            left: 100%;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
-            box-shadow: var(--shadow);
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 15px rgba(30, 60, 114, 0.3);
-        }
-        
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .btn-secondary:hover {
-            background: #545b62;
-        }
-        
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-        
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-        
-        .progress-container {
-            margin: 30px 0;
-            display: none;
-        }
-        
-        .progress-container.active {
-            display: block;
-        }
-        
-        .progress {
-            width: 100%;
-            height: 8px;
-            background: var(--border);
-            border-radius: 4px;
-            overflow: hidden;
-            position: relative;
-        }
-        
-        .progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--secondary));
-            width: 0%;
-            transition: width 0.3s ease;
-            position: relative;
-        }
-        
-        .progress-bar::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-            animation: shimmer 1.5s infinite;
-        }
-        
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-        
-        .progress-text {
-            text-align: center;
-            margin-top: 10px;
-            font-weight: 500;
-            color: var(--primary);
-        }
-        
-        .alert {
-            padding: 16px 20px;
-            border-radius: var(--border-radius);
-            margin-bottom: 20px;
-            border-left: 4px solid;
-            animation: slideDown 0.3s ease-out;
-        }
-        
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border-color: var(--success);
-        }
-        
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border-color: var(--danger);
-        }
-        
-        .alert-warning {
-            background: #fff3cd;
-            color: #856404;
-            border-color: var(--warning);
-        }
-        
-        .button-group {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 30px;
-        }
-        
-        .mapping-hint {
-            font-size: 0.85rem;
-            color: #6c757d;
-            margin-top: 8px;
-            font-style: italic;
-            background: white;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid #f0f0f0;
-        }
-        
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
-        }
-        
-        .feature-card {
-            background: white;
-            padding: 25px;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            text-align: center;
-            transition: var(--transition);
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-        }
-        
-        .feature-icon {
-            font-size: 3rem;
-            margin-bottom: 15px;
-            display: block;
-        }
-        
-        .logout-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: var(--transition);
-            z-index: 2;
-        }
-        
-        .logout-btn:hover {
-            background: rgba(255,255,255,0.3);
-        }
-        
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            
-            .header {
-                padding: 30px 20px;
-            }
-            
-            .header h1 {
-                font-size: 2.5rem;
-            }
-            
-            .main-content {
-                padding: 20px;
-            }
-            
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-            
-            .button-group {
-                flex-direction: column;
-            }
-            
-            .btn {
-                width: 100%;
-                justify-content: center;
-            }
-            
-            .logout-btn {
-                position: static;
-                margin: 10px auto;
-                display: block;
-                width: fit-content;
-            }
-        }
-        
-        .loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-        
-        .hidden {
-            display: none !important;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Bluex Automator - Herramienta de Conversión</title>
+  <meta name="description" content="Convierte exportaciones de Shopify al formato de carga masiva de Bluexpress" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+
+  <!-- Librerías -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- ExcelJS para preservar estilos de la plantilla oficial -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+
+  <style>
+    :root{
+      --primary:#1e3c72;--secondary:#2a5298;--success:#28a745;--danger:#dc3545;--warning:#ffc107;
+      --light:#f8f9fa;--dark:#333;--border:#e9ecef;--border-radius:8px;--shadow:0 4px 6px rgba(0,0,0,.1);
+      --transition:all .3s ease
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto',sans-serif;background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 100%);min-height:100vh;color:var(--dark);line-height:1.6}
+    .container{max-width:1200px;margin:0 auto;padding:20px}
+    .app-wrapper{background:#fff;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,.1);overflow:hidden}
+    .header{background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 100%);color:#fff;padding:40px;text-align:center;position:relative}
+    .header-content{position:relative;z-index:1}
+    .header h1{font-size:3rem;font-weight:300;margin-bottom:10px;text-shadow:0 2px 4px rgba(0,0,0,.2)}
+    .header p{font-size:1.2rem;opacity:.9;margin-bottom:20px}
+    .version-badge{display:inline-block;background:rgba(255,255,255,.2);padding:8px 16px;border-radius:20px;font-size:.9rem;font-weight:500}
+    .main-content{padding:40px}
+    .auth-section{max-width:400px;margin:0 auto 40px;text-align:center}
+    .auth-form{background:var(--light);padding:30px;border-radius:var(--border-radius);border:2px solid var(--border)}
+    .auth-form h3{color:var(--primary);margin-bottom:12px;font-size:1.5rem}
+    .app-section{display:none}
+    .app-section.active{display:block}
+    .section{background:var(--light);margin-bottom:30px;padding:30px;border-radius:var(--border-radius);border-left:4px solid var(--primary);box-shadow:var(--shadow)}
+    .section h3{color:var(--primary);margin-bottom:20px;font-size:1.4rem;display:flex;align-items:center;gap:10px}
+    .form-group{margin-bottom:20px}
+    .form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;align-items:end}
+    label{display:block;margin-bottom:8px;font-weight:600;color:var(--dark);font-size:.95rem}
+    input,select,textarea{width:100%;padding:12px 16px;border:2px solid var(--border);border-radius:var(--border-radius);font-size:14px;font-family:inherit;transition:var(--transition);background:#fff}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(30,60,114,.1)}
+    .file-input-wrapper{position:relative;display:block}
+    .file-input{position:absolute;left:-9999px;opacity:0}
+    .file-input-label{display:block;padding:20px;background:#fff;border:2px dashed var(--border);border-radius:var(--border-radius);text-align:center;cursor:pointer;transition:var(--transition);min-height:80px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px}
+    .file-input-label:hover{background:var(--light);border-color:var(--primary)}
+    .file-input-label.has-file{background:linear-gradient(135deg,#d4edda 0%,#c8e6c9 100%);border-color:var(--success);color:#155724;border-style:solid;border-width:3px}
+    .file-icon{font-size:2rem;opacity:.6}
+    .file-input-label.processing{background:linear-gradient(135deg,#fff3cd 0%,#ffe8a1 100%);border-color:var(--warning);color:#856404}
+    .file-info{margin-top:10px;padding:10px;background:#fff;border-radius:4px;border:1px solid #e0e0e0;display:none}
+    .file-info.visible{display:block}
+    .file-info-item{display:flex;justify-content:space-between;padding:4px 0;font-size:.9rem}
+    .file-info-label{color:#666;font-weight:500}
+    .file-info-value{color:var(--primary);font-weight:600}
+    .checkbox-wrapper{display:flex;align-items:center;gap:12px;margin:20px 0;padding:15px;background:#fff;border-radius:var(--border-radius);border:1px solid var(--border)}
+    .btn{padding:15px 30px;border:none;border-radius:var(--border-radius);font-size:16px;font-weight:600;cursor:pointer;transition:var(--transition);font-family:inherit;display:inline-flex;align-items:center;gap:8px}
+    .btn-primary{background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 100%);color:#fff}
+    .btn-secondary{background:#6c757d;color:#fff}
+    .progress-container{margin:30px 0;display:none}
+    .progress-container.active{display:block}
+    .progress{width:100%;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+    .progress-bar{height:100%;background:linear-gradient(90deg,var(--primary),var(--secondary));width:0%}
+    .progress-text{text-align:center;margin-top:10px;font-weight:500;color:var(--primary)}
+    .alert{padding:16px 20px;border-radius:var(--border-radius);margin-bottom:20px;border-left:4px solid}
+    .alert-success{background:#d4edda;color:#155724;border-color:var(--success)}
+    .alert-error{background:#f8d7da;color:#721c24;border-color:var(--danger)}
+    .alert-warning{background:#fff3cd;color:#856404;border-color:var(--warning)}
+    .alert-info{background:#d1ecf1;color:#0c5460;border-color:#bee5eb}
+    .hidden{display:none !important}
+    .logout-btn{position:absolute;top:20px;right:20px;background:rgba(255,255,255,.2);color:#fff;border:none;padding:8px 16px;border-radius:20px;cursor:pointer;font-size:.9rem}
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="app-wrapper">
-            <div class="header">
-                <button class="logout-btn hidden" id="logoutBtn" onclick="logout()">🚪 Cerrar Sesión</button>
-                <div class="header-content">
-                    <h1>🚀 Bluex Automator</h1>
-                    <p>Herramienta profesional para convertir pedidos de Shopify al formato de Bluexpress</p>
-                    <span class="version-badge">v2.0 - Web Edition</span>
-                </div>
-            </div>
-            
-            <div class="main-content">
-                <!-- Sección de Autenticación -->
-                <div class="auth-section" id="authSection">
-                    <div class="auth-form">
-                        <h3>🔐 Acceso Seguro</h3>
-                        <p>Esta herramienta requiere autorización para su uso.</p>
-                        <div class="form-group">
-                            <input type="password" id="accessPassword" placeholder="Código de acceso" autocomplete="current-password">
-                        </div>
-                        <button class="btn btn-primary" onclick="authenticate()">
-                            🔓 Ingresar
-                        </button>
-                        <div id="authError" class="alert alert-error hidden">
-                            Código de acceso incorrecto
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Aplicación Principal -->
-                <div class="app-section" id="appSection">
-                    <div id="alerts"></div>
-                    
-                    <!-- Información Importante -->
-                    <div class="section">
-                        <h3>💡 Instrucciones</h3>
-                        <div class="feature-grid">
-                            <div class="feature-card">
-                                <span class="feature-icon">📤</span>
-                                <h4>1. Exportar desde Shopify</h4>
-                                <p>Ve a Admin → Pedidos → Exportar. Incluye detalles de productos y envío.</p>
-                            </div>
-                            <div class="feature-card">
-                                <span class="feature-icon">⚙️</span>
-                                <h4>2. Configurar Opciones</h4>
-                                <p>Ajusta los valores por defecto y mapeos de región/comuna según tus necesidades.</p>
-                            </div>
-                            <div class="feature-card">
-                                <span class="feature-icon">📊</span>
-                                <h4>3. Generar Archivo</h4>
-                                <p>Descarga el archivo Excel listo para cargar en Bluexpress.</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Archivos -->
-                    <div class="section">
-                        <h3>📁 Archivos</h3>
-                        
-                        <div class="form-group">
-                            <label for="csvFile">Exportación de Shopify (CSV) *</label>
-                            <div class="file-input-wrapper">
-                                <input type="file" id="csvFile" class="file-input" accept=".csv" required>
-                                <label for="csvFile" class="file-input-label">
-                                    <span class="file-icon">📄</span>
-                                    <span class="file-text">Seleccionar archivo CSV de Shopify</span>
-                                    <small>Arrastra el archivo aquí o haz clic para seleccionar</small>
-                                </label>
-                            </div>
-                        </div>
-                        
-                        <div class="checkbox-wrapper">
-                            <input type="checkbox" id="useTemplate">
-                            <label for="useTemplate">📋 Usar plantilla oficial de Bluexpress (opcional)</label>
-                        </div>
-                        
-                        <div class="form-group hidden" id="templateGroup">
-                            <label for="templateFile">Plantilla de Bluexpress (XLSX)</label>
-                            <div class="file-input-wrapper">
-                                <input type="file" id="templateFile" class="file-input" accept=".xlsx">
-                                <label for="templateFile" class="file-input-label">
-                                    <span class="file-icon">📊</span>
-                                    <span class="file-text">Seleccionar plantilla oficial</span>
-                                    <small>Archivo .xlsx descargado de Bluexpress</small>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Configuración -->
-                    <div class="section">
-                        <h3>⚙️ Configuración</h3>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="valorCol">💰 Valor del contenido desde:</label>
-                                <select id="valorCol">
-                                    <option value="Subtotal">Subtotal</option>
-                                    <option value="Total">Total</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="prefijo">📞 Prefijo telefónico (código país):</label>
-                                <input type="text" id="prefijo" placeholder="56" value="56" maxlength="4">
-                            </div>
-                            <div class="form-group">
-                                <label for="maxDesc">📝 Máximo caracteres en descripción:</label>
-                                <input type="number" id="maxDesc" value="180" min="50" max="500">
-                            </div>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="tipoEntrega">🚚 Tipo de entrega por defecto:</label>
-                                <select id="tipoEntrega">
-                                    <option value="Domicilio">Domicilio</option>
-                                    <option value="Sucursal">Sucursal</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="garantia">🛡️ Garantía por defecto:</label>
-                                <select id="garantia">
-                                    <option value="No">No</option>
-                                    <option value="Sí">Sí</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="tamano">📦 Tamaño por defecto:</label>
-                                <select id="tamano">
-                                    <option value="XS">XS</option>
-                                    <option value="S">S</option>
-                                    <option value="M" selected>M</option>
-                                    <option value="L">L</option>
-                                    <option value="XL">XL</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Normalización -->
-                    <div class="section">
-                        <h3>🗺️ Normalización de Datos</h3>
-                        <p style="margin-bottom: 20px; color: #666;">
-                            Configura mapeos para estandarizar nombres de regiones y comunas según los requerimientos de Bluexpress.
-                        </p>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="mapRegion">🏛️ Normalización de Regiones:</label>
-                                <textarea id="mapRegion" placeholder="Región Metropolitana=RM&#10;Valparaíso=V Región&#10;Biobío=VIII Región&#10;Araucanía=IX Región"></textarea>
-                                <div class="mapping-hint">Una por línea, formato: <strong>clave=valor</strong><br>Ejemplo: "Región Metropolitana=RM"</div>
-                            </div>
-                            <div class="form-group">
-                                <label for="mapComuna">🏘️ Normalización de Comunas:</label>
-                                <textarea id="mapComuna" placeholder="Las Condes=Las Condes&#10;Providencia=Providencia&#10;Santiago Centro=Santiago&#10;Maipú=Maipu"></textarea>
-                                <div class="mapping-hint">Una por línea, formato: <strong>clave=valor</strong><br>Ejemplo: "Santiago Centro=Santiago"</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Progreso -->
-                    <div class="progress-container" id="progressContainer">
-                        <div class="progress">
-                            <div class="progress-bar" id="progressBar"></div>
-                        </div>
-                        <div class="progress-text" id="progressText">Procesando...</div>
-                    </div>
-                    
-                    <!-- Botones de Acción -->
-                    <div class="button-group">
-                        <button class="btn btn-primary" id="generateBtn">
-                            🚀 Generar Archivo Bluexpress
-                        </button>
-                        <button class="btn btn-secondary" id="saveConfigBtn">
-                            💾 Guardar Configuración
-                        </button>
-                        <button class="btn btn-secondary" id="loadConfigBtn">
-                            📂 Cargar Configuración
-                        </button>
-                        <button class="btn btn-secondary" onclick="resetForm()">
-                            🔄 Reiniciar Formulario
-                        </button>
-                    </div>
-                    
-                    <!-- Footer con información adicional -->
-                    <div class="section" style="margin-top: 40px; text-align: center; border-left: none; background: white;">
-                        <p style="color: #666; margin: 0;">
-                            <strong>Bluex Automator v2.0</strong> • Desarrollado para optimizar el flujo de trabajo con Bluexpress<br>
-                            <small>Todos los datos se procesan localmente en tu navegador. Ninguna información se envía a servidores externos.</small>
-                        </p>
-                    </div>
-                </div>
-            </div>
+  <div class="container">
+    <div class="app-wrapper">
+      <div class="header">
+        <button class="logout-btn hidden" id="logoutBtn" type="button" onclick="logout()">🚪 Cerrar Sesión</button>
+        <div class="header-content">
+          <h1>🚀 Bluex Automator</h1>
+          <p>Convierte pedidos de Shopify al formato Bluexpress (todo local en tu navegador)</p>
+          <span class="version-badge">v2.2 - Web Edition</span>
         </div>
+      </div>
+
+      <div class="main-content">
+        <!-- Auth -->
+        <div class="auth-section" id="authSection">
+          <div class="auth-form">
+            <h3>🔐 Acceso Seguro</h3>
+            <p>Ingresa tu código de acceso.</p>
+            <div class="form-group">
+              <input type="password" id="accessPassword" placeholder="Código de acceso" autocomplete="current-password" />
+            </div>
+            <button class="btn btn-primary" id="authBtn" type="button" onclick="authenticate()">🔓 Ingresar</button>
+            <div id="authError" class="alert alert-error hidden" role="alert" aria-live="polite">Código de acceso incorrecto</div>
+          </div>
+        </div>
+
+        <!-- App -->
+        <div class="app-section" id="appSection">
+          <div id="alerts"></div>
+
+          <div class="section">
+            <h3>💡 Instrucciones</h3>
+            <p>1) Exporta pedidos desde Shopify. 2) Configura opciones. 3) Genera el Excel para Bluexpress.</p>
+          </div>
+
+          <!-- Archivos -->
+          <div class="section">
+            <h3>📁 Archivos</h3>
+
+            <div class="form-group">
+              <label for="csvFile">Exportación de Shopify (CSV) *</label>
+              <div class="file-input-wrapper">
+                <input type="file" id="csvFile" class="file-input" accept=".csv" />
+                <label for="csvFile" class="file-input-label">
+                  <span class="file-icon">📄</span>
+                  <span class="file-text">Seleccionar archivo CSV de Shopify</span>
+                  <small class="file-help">Arrastra o haz clic para seleccionar</small>
+                </label>
+                <div class="file-info" id="csvFileInfo">
+                  <div class="file-info-item"><span class="file-info-label">Nombre:</span><span class="file-info-value" id="csvFileName">-</span></div>
+                  <div class="file-info-item"><span class="file-info-label">Tamaño:</span><span class="file-info-value" id="csvFileSize">-</span></div>
+                  <div class="file-info-item"><span class="file-info-label">Filas detectadas:</span><span class="file-info-value" id="csvRowCount">-</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="checkbox-wrapper">
+              <input type="checkbox" id="useTemplate" />
+              <label for="useTemplate">📋 Usar plantilla oficial de Bluexpress (preserva formato exacto)</label>
+            </div>
+
+            <div class="form-group hidden" id="templateGroup">
+              <label for="templateFile">Plantilla de Bluexpress (XLSX)</label>
+              <div class="file-input-wrapper">
+                <input type="file" id="templateFile" class="file-input" accept=".xlsx" />
+                <label for="templateFile" class="file-input-label">
+                  <span class="file-icon">📊</span>
+                  <span class="file-text">Seleccionar plantilla oficial</span>
+                  <small class="file-help">Sube el XLSX oficial de Bluexpress</small>
+                </label>
+                <div class="file-info" id="templateFileInfo">
+                  <div class="file-info-item"><span class="file-info-label">Nombre:</span><span class="file-info-value" id="templateFileName">-</span></div>
+                  <div class="file-info-item"><span class="file-info-label">Tamaño:</span><span class="file-info-value" id="templateFileSize">-</span></div>
+                  <div class="file-info-item"><span class="file-info-label">Estado:</span><span class="file-info-value" id="templateStatus">-</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Config -->
+          <div class="section">
+            <h3>⚙️ Configuración</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="valorCol">💰 Valor del contenido desde:</label>
+                <select id="valorCol">
+                  <option value="Subtotal">Subtotal</option>
+                  <option value="Total">Total</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="prefijo">📞 Prefijo telefónico (país):</label>
+                <input type="text" id="prefijo" value="56" maxlength="4" />
+              </div>
+              <div class="form-group">
+                <label for="maxDesc">📝 Máx. caracteres descripción:</label>
+                <input type="number" id="maxDesc" value="180" min="50" max="500" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="tipoEntrega">🚚 Tipo de entrega (default):</label>
+                <select id="tipoEntrega">
+                  <option value="Domicilio">Domicilio</option>
+                  <option value="Sucursal">Sucursal</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="garantia">🛡️ Garantía (default):</label>
+                <select id="garantia">
+                  <option value="No">No</option>
+                  <option value="Sí">Sí</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="tamano">📦 Tamaño (default):</label>
+                <select id="tamano">
+                  <option value="XS">XS</option>
+                  <option value="S">S</option>
+                  <option value="M" selected>M</option>
+                  <option value="L">L</option>
+                  <option value="XL">XL</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Normalización -->
+          <div class="section">
+            <h3>🗺️ Normalización de Datos</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="mapRegion">🏛️ Regiones (clave=valor por línea):</label>
+                <textarea id="mapRegion" placeholder="Región Metropolitana=RM&#10;Valparaíso=V Región"></textarea>
+              </div>
+              <div class="form-group">
+                <label for="mapComuna">🏘️ Comunas (clave=valor por línea):</label>
+                <textarea id="mapComuna" placeholder="Santiago Centro=Santiago&#10;Maipú=Maipu"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progreso -->
+          <div class="progress-container" id="progressContainer">
+            <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+            <div class="progress-text" id="progressText">Procesando...</div>
+          </div>
+
+          <!-- Acciones -->
+          <div class="section" style="text-align:center;border-left:none;background:#fff;">
+            <div class="form-row" style="justify-content:center">
+              <button class="btn btn-primary" id="generateBtn" type="button">🚀 Generar Archivo Bluexpress</button>
+              <button class="btn btn-secondary" id="saveConfigBtn" type="button">💾 Guardar Configuración</button>
+              <button class="btn btn-secondary" id="loadConfigBtn" type="button">📂 Cargar Configuración</button>
+              <button class="btn btn-secondary" type="button" onclick="resetForm()">🔄 Reiniciar</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
-    
-    <script>
-        // Configuración de seguridad
-        const ACCESS_PASSWORD = 'bluex-2024-secure'; // CAMBIAR ESTA CONTRASEÑA
-        const SESSION_KEY = 'bluex_session_active';
-        
-        // Configuración global
-        let appConfig = {
-            valor_contenido_col: 'Subtotal',
-            telefono_prefijo_pais: '56',
-            defaults: {
-                'Tipo Entrega*': 'Domicilio',
-                'Garantía*': 'No',
-                'Tamaño*': 'M'
-            },
-            max_desc_len: 180,
-            normalize: {
-                'Región*': {},
-                'Comuna*': {}
+  </div>
+
+  <script>
+    // ====== Seguridad / sesión ======
+    const ACCESS_PASSWORD = 'bluex'; // cámbiala en producción
+    const SESSION_KEY = 'bluex_session_active';
+
+    function authenticate(){
+      const pass = (document.getElementById('accessPassword').value || '').trim();
+      if(pass === ACCESS_PASSWORD){
+        sessionStorage.setItem(SESSION_KEY, 'true');
+        document.getElementById('authSection').classList.add('hidden');
+        document.getElementById('appSection').classList.add('active');
+        document.getElementById('logoutBtn').classList.remove('hidden');
+        showAlert('¡Acceso autorizado!', 'success');
+      }else{
+        document.getElementById('authError').classList.remove('hidden');
+        document.getElementById('accessPassword').value='';
+        document.getElementById('accessPassword').focus();
+      }
+    }
+    function logout(){
+      sessionStorage.removeItem(SESSION_KEY);
+      document.getElementById('authSection').classList.remove('hidden');
+      document.getElementById('appSection').classList.remove('active');
+      document.getElementById('logoutBtn').classList.add('hidden');
+      clearAlerts(); resetProgress();
+    }
+    window.authenticate = authenticate;
+    window.logout = logout;
+    window.resetForm = resetForm;
+
+    (function restoreSession(){
+      if(sessionStorage.getItem(SESSION_KEY)==='true'){
+        document.getElementById('authSection').classList.add('hidden');
+        document.getElementById('appSection').classList.add('active');
+        document.getElementById('logoutBtn').classList.remove('hidden');
+        showAlert('Sesión restaurada.', 'info');
+      }
+    })();
+
+    // ====== Config por defecto ======
+    let appConfig = {
+      valor_contenido_col: 'Subtotal',
+      telefono_prefijo_pais: '56',
+      defaults: { 'Tipo Entrega*':'Domicilio','Garantía*':'No','Tamaño*':'M' },
+      max_desc_len: 180,
+      normalize: { 'Región*': {}, 'Comuna*': {} }
+    };
+    const BLUEX_COLUMNS = [
+      "N°","Nombre*","Apellido*","Telefono*","Correo*","Tipo Entrega*","Región*","Comuna*",
+      "Nombre Calle*","N° Domicilio *","Dpto / Oficina","Referencia Ayuda","Descripción Contenido*",
+      "Valor Contenido*","Garantía*","N° Boleta / Factura","Tamaño*"
+    ];
+
+    // ====== Helpers UI ======
+    const elements = {
+      alerts: document.getElementById('alerts'),
+      progressContainer: document.getElementById('progressContainer'),
+      progressBar: document.getElementById('progressBar'),
+      progressText: document.getElementById('progressText'),
+      csvInput: document.getElementById('csvFile'),
+      tplInput: document.getElementById('templateFile'),
+      useTemplate: document.getElementById('useTemplate'),
+      templateGroup: document.getElementById('templateGroup'),
+      csvFileInfo: document.getElementById('csvFileInfo'),
+      templateFileInfo: document.getElementById('templateFileInfo'),
+      generateBtn: document.getElementById('generateBtn'),
+      saveConfigBtn: document.getElementById('saveConfigBtn'),
+      loadConfigBtn: document.getElementById('loadConfigBtn'),
+    };
+
+    function showAlert(msg,type='success'){
+      const div = document.createElement('div');
+      div.className = `alert alert-${type}`;
+      const icon = type==='success'?'✅':type==='error'?'❌':type==='warning'?'⚠️':'ℹ️';
+      div.innerHTML = `<strong>${icon}</strong> ${msg}`;
+      elements.alerts.appendChild(div);
+      setTimeout(()=>div.remove(),5000);
+    }
+    function clearAlerts(){ elements.alerts.innerHTML=''; }
+    function updateProgress(pct,text='Procesando...'){
+      elements.progressContainer.classList.add('active');
+      elements.progressBar.style.width = `${pct}%`;
+      elements.progressText.textContent = text;
+      if(pct>=100) setTimeout(resetProgress,1500);
+    }
+    function resetProgress(){
+      elements.progressContainer.classList.remove('active');
+      elements.progressBar.style.width = '0%';
+      elements.progressText.textContent = 'Procesando...';
+    }
+
+    // ====== Eventos de archivos (fix Safari) ======
+    function bindFileInput(inputEl, infoBoxIds){
+      const wrapper = inputEl.closest('.file-input-wrapper');
+      const label = wrapper.querySelector('.file-input-label');
+      const fileText = label.querySelector('.file-text');
+
+      const setHasFile = (file) => {
+        if(file){
+          label.classList.add('has-file');
+          label.classList.remove('processing');
+          fileText.innerHTML = `<strong>✅ ${file.name}</strong>`;
+        }else{
+          label.classList.remove('has-file','processing');
+          fileText.textContent = inputEl.id === 'csvFile'
+            ? 'Seleccionar archivo CSV de Shopify'
+            : 'Seleccionar plantilla oficial';
+        }
+      };
+
+      const onSelect = async () => {
+        const file = inputEl.files && inputEl.files[0];
+        if(!file){ setHasFile(null); return; }
+
+        label.classList.add('processing');
+        try{
+          if(inputEl.id === 'csvFile'){
+            if(!file.name.toLowerCase().endsWith('.csv')){
+              showAlert('Selecciona un CSV válido.','warning'); setHasFile(null); return;
             }
-        };
-        
-        // Columnas del formato Bluexpress
-        const BLUEX_COLUMNS = [
-            "N°", "Nombre*", "Apellido*", "Telefono*", "Correo*", "Tipo Entrega*",
-            "Región*", "Comuna*", "Nombre Calle*", "N° Domicilio *", "Dpto / Oficina",
-            "Referencia Ayuda", "Descripción Contenido*", "Valor Contenido*", "Garantía*",
-            "N° Boleta / Factura", "Tamaño*"
-        ];
-        
-        // Elementos del DOM
-        let elements = {};
-        
-        // Inicialización de la aplicación
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeElements();
-            setupEventListeners();
-            checkAuthentication();
-            loadConfiguration();
+            const content = await file.text();
+            const parsed = Papa.parse(content,{ header:true, skipEmptyLines:true });
+            document.getElementById('csvFileName').textContent = file.name;
+            document.getElementById('csvFileSize').textContent = formatSize(file.size);
+            document.getElementById('csvRowCount').textContent = `${parsed.data.length} pedidos`;
+            elements.csvFileInfo.classList.add('visible');
+            setHasFile(file);
+            showAlert(`CSV cargado: ${parsed.data.length} filas.`,'success');
+          }else{
+            if(!file.name.toLowerCase().endsWith('.xlsx')){
+              showAlert('Selecciona un XLSX válido.','warning'); setHasFile(null); return;
+            }
+            // Validación rápida con ExcelJS: detectar fila de cabeceras
+            const buf = await file.arrayBuffer();
+            const wb = new ExcelJS.Workbook();
+            await wb.xlsx.load(buf);
+            const ws = wb.worksheets[0];
+            const check = findHeaderMappingExcelJS(ws, BLUEX_COLUMNS);
+            document.getElementById('templateFileName').textContent = file.name;
+            document.getElementById('templateFileSize').textContent = formatSize(file.size);
+            document.getElementById('templateStatus').textContent = check ? '✅ Plantilla válida' : '⚠️ Revisar columnas';
+            elements.templateFileInfo.classList.add('visible');
+            setHasFile(file);
+            showAlert(check ? 'Plantilla validada.' : 'No se hallaron todas las columnas esperadas.','info');
+          }
+        }catch(e){
+          console.error(e);
+          showAlert('Error al analizar el archivo.','error');
+          setHasFile(null);
+        }
+      };
+
+      // change + input (Safari)
+      inputEl.addEventListener('change', onSelect);
+      inputEl.addEventListener('input', onSelect);
+    }
+
+    function formatSize(bytes){
+      if(bytes===0) return '0 Bytes';
+      const k=1024, sizes=['Bytes','KB','MB','GB'];
+      const i = Math.floor(Math.log(bytes)/Math.log(k));
+      return Math.round((bytes/Math.pow(k,i))*100)/100 + ' ' + sizes[i];
+    }
+
+    // Bind CSV y plantilla
+    bindFileInput(elements.csvInput, {name:'csvFileName',size:'csvFileSize',rows:'csvRowCount'});
+    bindFileInput(elements.tplInput, {name:'templateFileName',size:'templateFileSize'});
+
+    // Toggle plantilla
+    elements.useTemplate.addEventListener('change', ()=>{
+      elements.templateGroup.classList.toggle('hidden', !elements.useTemplate.checked);
+      if(elements.useTemplate.checked){
+        showAlert('Usando plantilla oficial: se preservará el formato.','info');
+      }
+    });
+
+    // Drag & Drop (opcional)
+    document.querySelectorAll('.file-input-label').forEach(label=>{
+      ['dragenter','dragover','dragleave','drop'].forEach(ev=>label.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();}));
+      label.addEventListener('drop',(e)=>{
+        const inputId = label.getAttribute('for');
+        const input = document.getElementById(inputId);
+        if(e.dataTransfer.files && e.dataTransfer.files.length){
+          // Algunos navegadores bloquean asignar FileList; disparamos selector si falla
+          try{ input.files = e.dataTransfer.files; input.dispatchEvent(new Event('input', {bubbles:true})); }
+          catch(_){ input.click(); }
+        }
+      });
+    });
+
+    // ====== Config (guardar/cargar) ======
+    function getConfigFromUI(){
+      return {
+        valor_contenido_col: document.getElementById('valorCol').value,
+        telefono_prefijo_pais: document.getElementById('prefijo').value,
+        defaults: {
+          'Tipo Entrega*': document.getElementById('tipoEntrega').value,
+          'Garantía*': document.getElementById('garantia').value,
+          'Tamaño*': document.getElementById('tamano').value
+        },
+        max_desc_len: parseInt(document.getElementById('maxDesc').value) || 180,
+        normalize: {
+          'Región*': parseMapping(document.getElementById('mapRegion').value),
+          'Comuna*': parseMapping(document.getElementById('mapComuna').value)
+        }
+      };
+    }
+    function setUIFromConfig(cfg){
+      document.getElementById('valorCol').value = cfg.valor_contenido_col || 'Subtotal';
+      document.getElementById('prefijo').value = cfg.telefono_prefijo_pais || '56';
+      document.getElementById('maxDesc').value = cfg.max_desc_len || 180;
+      document.getElementById('tipoEntrega').value = cfg.defaults?.['Tipo Entrega*'] || 'Domicilio';
+      document.getElementById('garantia').value = cfg.defaults?.['Garantía*'] || 'No';
+      document.getElementById('tamano').value = cfg.defaults?.['Tamaño*'] || 'M';
+      document.getElementById('mapRegion').value = toMappingText(cfg.normalize?.['Región*']||{});
+      document.getElementById('mapComuna').value = toMappingText(cfg.normalize?.['Comuna*']||{});
+    }
+    function toMappingText(obj){ return Object.entries(obj).map(([k,v])=>`${k}=${v}`).join('\n'); }
+    function parseMapping(text){
+      const map={}; if(!text) return map;
+      text.split('\n').forEach(line=>{
+        const s=line.trim(); if(!s || s.startsWith('#')) return;
+        const i=s.indexOf('='); if(i===-1) return;
+        map[s.slice(0,i).trim()] = s.slice(i+1).trim();
+      });
+      return map;
+    }
+    document.getElementById('saveConfigBtn').addEventListener('click', ()=>{
+      appConfig = getConfigFromUI();
+      localStorage.setItem('bluex_config', JSON.stringify(appConfig));
+      showAlert('Configuración guardada en este navegador.','success');
+    });
+    document.getElementById('loadConfigBtn').addEventListener('click', ()=>{
+      const raw = localStorage.getItem('bluex_config');
+      if(!raw){ showAlert('No hay configuración guardada.','info'); return; }
+      try{ const cfg = JSON.parse(raw); appConfig = cfg; setUIFromConfig(cfg); showAlert('Configuración cargada.','success'); }
+      catch(e){ showAlert('Error al cargar configuración.','error'); }
+    });
+    (function loadOnStart(){
+      try{ const raw = localStorage.getItem('bluex_config'); if(raw){ const cfg=JSON.parse(raw); appConfig=cfg; setUIFromConfig(cfg);} }catch(_){}
+    })();
+
+    // ====== Transformaciones ======
+    function cleanDigitsOnly(s){ return s ? String(s).replace(/\D/g,'') : ''; }
+    function splitFullName(fullName){
+      if(!fullName || !String(fullName).trim()) return ['-','-'];
+      const parts = String(fullName).trim().split(/\s+/);
+      return parts.length===1 ? [parts[0],'-'] : [parts[0], parts.slice(1).join(' ')];
+    }
+    function extractStreetAndNumber(address){
+      if(!address) return ['',''];
+      const addr = String(address).trim();
+      const m = addr.match(/^(.*?)[\s,]+(\d+[A-Za-z\-]?)\s*$/);
+      if(m) return [m[1].trim(), m[2].trim()];
+      const tokens = addr.split(/\s+/);
+      if(tokens.length>0 && /\d/.test(tokens[tokens.length-1])) return [tokens.slice(0,-1).join(' '), tokens[tokens.length-1]];
+      return [addr,''];
+    }
+    function pickFirstValid(row,...fields){ for(const f of fields){ if(row[f] && String(row[f]).trim()!=='') return row[f]; } return ''; }
+    function buildProductDescription(orderItems,maxLen){
+      const items=[];
+      for(const it of orderItems){
+        const qty = parseInt(it['Lineitem quantity'] ?? 1) || 1;
+        const name = String(it['Lineitem name']||'').trim();
+        if(name) items.push(`x${qty} ${name}`);
+      }
+      const desc = items.length? items.join(' | '): 'Productos de ecommerce';
+      return desc.substring(0,maxLen);
+    }
+    function normalizeValue(v, map){ if(!map || !v) return v; const key=String(v).trim(); return map[key] ?? v; }
+
+    function convertShopifyToBluex(rows, cfg){
+      const groups = {};
+      for(const r of rows){
+        const num = r['Name'];
+        (groups[num] ||= []).push(r);
+      }
+      const out=[]; let n=1;
+      for(const [orderNumber, items] of Object.entries(groups)){
+        const first = items[0] || {};
+        const fullName = pickFirstValid(first,'Shipping Name','Billing Name');
+        const [nombre, apellido] = splitFullName(fullName);
+        let phone = pickFirstValid(first,'Shipping Phone','Phone');
+        phone = cleanDigitsOnly(phone);
+        const pref = String(cfg.telefono_prefijo_pais||'').trim();
+        if(pref && phone && !phone.startsWith(pref)) phone = pref + phone;
+
+        const email = pickFirstValid(first,'Email');
+        let region = pickFirstValid(first,'Shipping Province Name','Shipping Province');
+        let comuna = pickFirstValid(first,'Shipping City');
+        const address1 = pickFirstValid(first,'Shipping Address1','Shipping Street');
+        const address2 = pickFirstValid(first,'Shipping Address2');
+        const [calle, numero] = extractStreetAndNumber(address1);
+        const notas = pickFirstValid(first,'Notes','Note Attributes');
+
+        const desc = buildProductDescription(items, cfg.max_desc_len);
+        const valCol = cfg.valor_contenido_col;
+        let valor = pickFirstValid(first, valCol);
+        try{ valor = parseFloat(String(valor).replace(/[$,]/g,'').trim()) || ''; }catch(_){ valor=''; }
+
+        region = normalizeValue(region, cfg.normalize['Región*']);
+        comuna = normalizeValue(comuna, cfg.normalize['Comuna*']);
+
+        out.push({
+          'N°': n++,
+          'Nombre*': nombre,
+          'Apellido*': apellido,
+          'Telefono*': phone,
+          'Correo*': email,
+          'Tipo Entrega*': cfg.defaults['Tipo Entrega*'],
+          'Región*': region,
+          'Comuna*': comuna,
+          'Nombre Calle*': calle,
+          'N° Domicilio *': numero,
+          'Dpto / Oficina': address2,
+          'Referencia Ayuda': notas,
+          'Descripción Contenido*': desc,
+          'Valor Contenido*': valor,
+          'Garantía*': cfg.defaults['Garantía*'],
+          'N° Boleta / Factura': orderNumber,
+          'Tamaño*': cfg.defaults['Tamaño*']
         });
-        
-        function initializeElements() {
-            elements = {
-                authSection: document.getElementById('authSection'),
-                appSection: document.getElementById('appSection'),
-                accessPassword: document.getElementById('accessPassword'),
-                authError: document.getElementById('authError'),
-                logoutBtn: document.getElementById('logoutBtn'),
-                csvFile: document.getElementById('csvFile'),
-                templateFile: document.getElementById('templateFile'),
-                useTemplate: document.getElementById('useTemplate'),
-                templateGroup: document.getElementById('templateGroup'),
-                generateBtn: document.getElementById('generateBtn'),
-                saveConfigBtn: document.getElementById('saveConfigBtn'),
-                loadConfigBtn: document.getElementById('loadConfigBtn'),
-                alerts: document.getElementById('alerts'),
-                progressContainer: document.getElementById('progressContainer'),
-                progressBar: document.getElementById('progressBar'),
-                progressText: document.getElementById('progressText')
-            };
+      }
+      return out;
+    }
+
+    // ====== Generar archivo ======
+    document.getElementById('generateBtn').addEventListener('click', generateFile);
+
+    async function generateFile(){
+      try{
+        const csvFile = elements.csvInput.files && elements.csvInput.files[0];
+        if(!csvFile){ showAlert('Debes seleccionar un archivo CSV de Shopify.','error'); return; }
+        if(elements.useTemplate.checked){
+          const tpl = elements.tplInput.files && elements.tplInput.files[0];
+          if(!tpl){ showAlert('Seleccionaste “usar plantilla”, pero no subiste el XLSX oficial.','error'); return; }
         }
-        
-        function setupEventListeners() {
-            // Autenticación
-            elements.accessPassword.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') authenticate();
-            });
-            
-            // Archivos
-            elements.csvFile.addEventListener('change', handleFileSelect);
-            elements.templateFile.addEventListener('change', handleFileSelect);
-            elements.useTemplate.addEventListener('change', toggleTemplate);
-            
-            // Botones principales
-            elements.generateBtn.addEventListener('click', generateFile);
-            elements.saveConfigBtn.addEventListener('click', saveConfiguration);
-            elements.loadConfigBtn.addEventListener('click', loadConfiguration);
-            
-            // Drag & Drop para archivos
-            setupDragDrop();
+
+        elements.generateBtn.disabled = true;
+        updateProgress(10,'Leyendo configuración...');
+        appConfig = getConfigFromUI();
+
+        updateProgress(30,'Leyendo CSV...');
+        const csvContent = await csvFile.text();
+        const parsed = Papa.parse(csvContent,{ header:true, skipEmptyLines:true, dynamicTyping:true, transformHeader:h=>h.trim() });
+        const shopifyRows = parsed.data || [];
+
+        updateProgress(55,'Convirtiendo pedidos...');
+        const bluexData = convertShopifyToBluex(shopifyRows, appConfig);
+
+        const now = new Date();
+        const ts = now.toISOString().slice(0,19).replace(/[:T]/g,'_').replace(/-/g,'');
+        const fileName = `bluexpress_carga_${ts}.xlsx`;
+
+        if(elements.useTemplate.checked){
+          updateProgress(75,'Rellenando plantilla (preservando formato)...');
+          await generateWithTemplateExcelJS(bluexData, elements.tplInput.files[0], fileName);
+          showAlert('📋 Plantilla oficial preservada.','success');
+        }else{
+          updateProgress(75,'Generando XLSX...');
+          const ws = XLSX.utils.json_to_sheet(bluexData);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'Datos Bluexpress');
+          XLSX.writeFile(wb, fileName);
         }
-        
-        function setupDragDrop() {
-            const fileLabels = document.querySelectorAll('.file-input-label');
-            
-            fileLabels.forEach(label => {
-                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                    label.addEventListener(eventName, preventDefaults, false);
-                });
-                
-                ['dragenter', 'dragover'].forEach(eventName => {
-                    label.addEventListener(eventName, highlight, false);
-                });
-                
-                ['dragleave', 'drop'].forEach(eventName => {
-                    label.addEventListener(eventName, unhighlight, false);
-                });
-                
-                label.addEventListener('drop', handleDrop, false);
-            });
+
+        updateProgress(100,'¡Completado!');
+        showAlert(`Se procesaron ${bluexData.length} pedidos.`, 'success');
+      }catch(e){
+        console.error(e);
+        showAlert(`Error: ${e.message}`, 'error');
+        resetProgress();
+      }finally{
+        elements.generateBtn.disabled = false;
+      }
+    }
+
+    // ====== ExcelJS: usar plantilla y mantener estilos ======
+    function findHeaderMappingExcelJS(ws, requiredCols){
+      // Busca la fila (1..50) con al menos 10 coincidencias de cabeceras
+      for(let r=1; r<=50; r++){
+        const mapping = {};
+        let found=0;
+        for(let c=1; c<=50; c++){
+          const cell = ws.getCell(r,c);
+          const raw = cell?.value;
+          const text = raw && raw.richText ? raw.richText.map(rt=>rt.text).join('') : (raw ?? '');
+          const val = String(text).trim();
+          if(requiredCols.includes(val)){ mapping[val]=c; found++; }
         }
-        
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
+        if(found>=10) return { headerRowNumber:r, columnMapping:mapping };
+      }
+      return null;
+    }
+
+    async function generateWithTemplateExcelJS(data, templateFile, outName){
+      const buf = await templateFile.arrayBuffer();
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf);
+      const ws = wb.worksheets[0];
+
+      const result = findHeaderMappingExcelJS(ws, BLUEX_COLUMNS);
+      if(!result) throw new Error('No se encontraron cabeceras esperadas en la plantilla.');
+      const { headerRowNumber, columnMapping } = result;
+      const startRow = headerRowNumber + 1;
+
+      // Limpieza suave de rango (manteniendo estilos): 20k filas por si acaso
+      for(let r=startRow; r<startRow+20000; r++){
+        for(const colIdx of Object.values(columnMapping)){
+          ws.getCell(r, colIdx).value = null;
         }
-        
-        function highlight(e) {
-            e.target.closest('.file-input-label').style.background = '#e3f2fd';
-            e.target.closest('.file-input-label').style.borderColor = '#1976d2';
+      }
+
+      // Escribir registros
+      data.forEach((record, i)=>{
+        const r = startRow + i;
+        for(const [colName, val] of Object.entries(record)){
+          const c = columnMapping[colName];
+          if(c){ ws.getCell(r,c).value = (val === '' ? null : val); }
         }
-        
-        function unhighlight(e) {
-            e.target.closest('.file-input-label').style.background = '';
-            e.target.closest('.file-input-label').style.borderColor = '';
-        }
-        
-        function handleDrop(e) {
-            const label = e.target.closest('.file-input-label');
-            const fileInput = document.querySelector(`#${label.getAttribute('for')}`);
-            const files = e.dataTransfer.files;
-            
-            if (files.length > 0) {
-                fileInput.files = files;
-                handleFileSelect({ target: fileInput });
-            }
-        }
-        
-        function authenticate() {
-            const password = elements.accessPassword.value;
-            
-            if (password === ACCESS_PASSWORD) {
-                sessionStorage.setItem(SESSION_KEY, 'true');
-                elements.authSection.classList.add('hidden');
-                elements.appSection.classList.add('active');
-                elements.logoutBtn.classList.remove('hidden');
-                elements.authError.classList.add('hidden');
-                showAlert('¡Acceso autorizado! Bienvenido al Bluex Automator.', 'success');
-            } else {
-                elements.authError.classList.remove('hidden');
-                elements.accessPassword.value = '';
-                elements.accessPassword.focus();
-            }
-        }
-        
-        function logout() {
-            sessionStorage.removeItem(SESSION_KEY);
-            localStorage.removeItem('bluex_config');
-            elements.authSection.classList.remove('hidden');
-            elements.appSection.classList.remove('active');
-            elements.logoutBtn.classList.add('hidden');
-            elements.accessPassword.value = '';
-            clearAlerts();
-            resetProgress();
-        }
-        
-        function checkAuthentication() {
-            const isAuthenticated = sessionStorage.getItem(SESSION_KEY) === 'true';
-            if (isAuthenticated) {
-                elements.authSection.classList.add('hidden');
-                elements.appSection.classList.add('active');
-                elements.logoutBtn.classList.remove('hidden');
-            }
-        }
-        
-        function handleFileSelect(e) {
-            const file = e.target.files[0];
-            const label = document.querySelector(`label[for="${e.target.id}"]`);
-            const fileText = label.querySelector('.file-text');
-            
-            if (file) {
-                fileText.textContent = `✅ ${file.name}`;
-                label.classList.add('has-file');
-                
-                // Validar tipo de archivo
-                if (e.target.id === 'csvFile' && !file.name.toLowerCase().endsWith('.csv')) {
-                    showAlert('Por favor selecciona un archivo CSV válido.', 'warning');
-                }
-                if (e.target.id === 'templateFile' && !file.name.toLowerCase().endsWith('.xlsx')) {
-                    showAlert('Por favor selecciona un archivo Excel (.xlsx) válido.', 'warning');
-                }
-            } else {
-                const defaultText = e.target.id === 'csvFile' ? 
-                    'Seleccionar archivo CSV de Shopify' : 
-                    'Seleccionar plantilla oficial';
-                fileText.textContent = defaultText;
-                label.classList.remove('has-file');
-            }
-        }
-        
-        function toggleTemplate() {
-            const isChecked = elements.useTemplate.checked;
-            elements.templateGroup.classList.toggle('hidden', !isChecked);
-        }
-        
-        function showAlert(message, type = 'success') {
-            const alert = document.createElement('div');
-            alert.className = `alert alert-${type}`;
-            alert.innerHTML = `
-                <strong>${type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️'}</strong>
-                ${message}
-            `;
-            
-            elements.alerts.appendChild(alert);
-            
-            // Auto-remover después de 5 segundos
-            setTimeout(() => {
-                if (alert.parentNode) {
-                    alert.remove();
-                }
-            }, 5000);
-            
-            // Scroll suave hacia la alerta
-            alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-        
-        function clearAlerts() {
-            elements.alerts.innerHTML = '';
-        }
-        
-        function updateProgress(percent, text = 'Procesando...') {
-            elements.progressContainer.classList.add('active');
-            elements.progressBar.style.width = `${percent}%`;
-            elements.progressText.textContent = text;
-            
-            if (percent >= 100) {
-                setTimeout(() => {
-                    resetProgress();
-                }, 1500);
-            }
-        }
-        
-        function resetProgress() {
-            elements.progressContainer.classList.remove('active');
-            elements.progressBar.style.width = '0%';
-            elements.progressText.textContent = 'Procesando...';
-        }
-        
-        // Funciones de procesamiento de datos
-        function cleanDigitsOnly(str) {
-            if (!str) return '';
-            return String(str).replace(/\D/g, '');
-        }
-        
-        function splitFullName(fullName) {
-            if (!fullName || String(fullName).trim() === '') {
-                return ['-', '-'];
-            }
-            const parts = String(fullName).trim().split(' ');
-            if (parts.length === 1) {
-                return [parts[0], '-'];
-            }
-            return [parts[0], parts.slice(1).join(' ')];
-        }
-        
-        function extractStreetAndNumber(address) {
-            if (!address) return ['', ''];
-            
-            const addr = String(address).trim();
-            const match = addr.match(/^(.*?)[\s,]+(\d+[A-Za-z\-]?)\s*$/);
-            
-            if (match) {
-                return [match[1].trim(), match[2].trim()];
-            }
-            
-            const tokens = addr.split(' ');
-            if (tokens.length > 0 && /\d/.test(tokens[tokens.length - 1])) {
-                return [tokens.slice(0, -1).join(' '), tokens[tokens.length - 1]];
-            }
-            
-            return [addr, ''];
-        }
-        
-        function pickFirstValid(row, ...fields) {
-            for (const field of fields) {
-                if (row[field] && String(row[field]).trim() !== '') {
-                    return row[field];
-                }
-            }
-            return '';
-        }
-        
-        function buildProductDescription(orderItems, maxLength) {
-            const items = [];
-            
-            for (const item of orderItems) {
-                let quantity = item['Lineitem quantity'] || 1;
-                try {
-                    quantity = parseInt(quantity) || 1;
-                } catch (e) {
-                    quantity = 1;
-                }
-                
-                const productName = String(item['Lineitem name'] || '').trim();
-                if (productName) {
-                    items.push(`x${quantity} ${productName}`);
-                }
-            }
-            
-            const description = items.length > 0 ? items.join(' | ') : 'Productos de ecommerce';
-            return description.substring(0, maxLength);
-        }
-        
-        function parseNormalizationMapping(text) {
-            const mapping = {};
-            if (!text) return mapping;
-            
-            const lines = text.split('\n');
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed || trimmed.startsWith('#')) continue;
-                
-                if (trimmed.includes('=')) {
-                    const [key, value] = trimmed.split('=', 2);
-                    mapping[key.trim()] = value.trim();
-                }
-            }
-            return mapping;
-        }
-        
-        function normalizeValue(value, mappingObject) {
-            if (!mappingObject || !value) return value;
-            const key = String(value).trim();
-            return mappingObject[key] || value;
-        }
-        
-        function convertShopifyToBluex(shopifyData, config) {
-            const processedOrders = [];
-            const orderGroups = {};
-            
-            // Agrupar líneas de productos por orden
-            for (const row of shopifyData) {
-                const orderNumber = row['Name'];
-                if (!orderGroups[orderNumber]) {
-                    orderGroups[orderNumber] = [];
-                }
-                orderGroups[orderNumber].push(row);
-            }
-            
-            let orderCounter = 1;
-            
-            for (const [orderNumber, orderItems] of Object.entries(orderGroups)) {
-                const firstItem = orderItems[0];
-                
-                // Extraer información del cliente
-                const fullName = pickFirstValid(firstItem, 'Shipping Name', 'Billing Name');
-                const [firstName, lastName] = splitFullName(fullName);
-                
-                // Procesar teléfono
-                let phone = pickFirstValid(firstItem, 'Shipping Phone', 'Phone');
-                phone = cleanDigitsOnly(phone);
-                const countryPrefix = String(config.telefono_prefijo_pais || '').trim();
-                if (countryPrefix && phone && !phone.startsWith(countryPrefix)) {
-                    phone = countryPrefix + phone;
-                }
-                
-                // Información de contacto y dirección
-                const email = pickFirstValid(firstItem, 'Email');
-                let region = pickFirstValid(firstItem, 'Shipping Province Name', 'Shipping Province');
-                let city = pickFirstValid(firstItem, 'Shipping City');
-                const address1 = pickFirstValid(firstItem, 'Shipping Address1', 'Shipping Street');
-                const address2 = pickFirstValid(firstItem, 'Shipping Address2');
-                
-                const [streetName, streetNumber] = extractStreetAndNumber(address1);
-                const notes = pickFirstValid(firstItem, 'Notes', 'Note Attributes');
-                
-                // Construir descripción de productos
-                const productDescription = buildProductDescription(orderItems, config.max_desc_len);
-                
-                // Calcular valor
-                const valueColumn = config.valor_contenido_col;
-                let orderValue = pickFirstValid(firstItem, valueColumn);
-                try {
-                    orderValue = parseFloat(String(orderValue).replace(/[$,]/g, '').trim()) || '';
-                } catch (e) {
-                    orderValue = '';
-                }
-                
-                // Aplicar normalización
-                region = normalizeValue(region, config.normalize['Región*']);
-                city = normalizeValue(city, config.normalize['Comuna*']);
-                
-                // Crear registro para Bluexpress
-                const bluexRecord = {
-                    'N°': orderCounter++,
-                    'Nombre*': firstName,
-                    'Apellido*': lastName,
-                    'Telefono*': phone,
-                    'Correo*': email,
-                    'Tipo Entrega*': config.defaults['Tipo Entrega*'],
-                    'Región*': region,
-                    'Comuna*': city,
-                    'Nombre Calle*': streetName,
-                    'N° Domicilio *': streetNumber,
-                    'Dpto / Oficina': address2,
-                    'Referencia Ayuda': notes,
-                    'Descripción Contenido*': productDescription,
-                    'Valor Contenido*': orderValue,
-                    'Garantía*': config.defaults['Garantía*'],
-                    'N° Boleta / Factura': orderNumber,
-                    'Tamaño*': config.defaults['Tamaño*']
-                };
-                
-                processedOrders.push(bluexRecord);
-            }
-            
-            return processedOrders;
-        }
-        
-        async function generateFile() {
-            try {
-                // Validaciones iniciales
-                if (!elements.csvFile.files[0]) {
-                    showAlert('Debes seleccionar un archivo CSV de Shopify', 'error');
-                    return;
-                }
-                
-                if (elements.useTemplate.checked && !elements.templateFile.files[0]) {
-                    showAlert('Debes seleccionar la plantilla de Bluexpress', 'error');
-                    return;
-                }
-                
-                // Deshabilitar botón durante procesamiento
-                elements.generateBtn.disabled = true;
-                elements.generateBtn.classList.add('loading');
-                
-                updateProgress(10, 'Leyendo configuración...');
-                
-                // Obtener configuración actual de la interfaz
-                appConfig = {
-                    valor_contenido_col: document.getElementById('valorCol').value,
-                    telefono_prefijo_pais: document.getElementById('prefijo').value,
-                    defaults: {
-                        'Tipo Entrega*': document.getElementById('tipoEntrega').value,
-                        'Garantía*': document.getElementById('garantia').value,
-                        'Tamaño*': document.getElementById('tamano').value
-                    },
-                    max_desc_len: parseInt(document.getElementById('maxDesc').value) || 180,
-                    normalize: {
-                        'Región*': parseNormalizationMapping(document.getElementById('mapRegion').value),
-                        'Comuna*': parseNormalizationMapping(document.getElementById('mapComuna').value)
-                    }
-                };
-                
-                updateProgress(30, 'Procesando archivo CSV...');
-                
-                // Leer archivo CSV
-                const csvFile = elements.csvFile.files[0];
-                const csvContent = await csvFile.text();
-                
-                updateProgress(50, 'Convirtiendo datos...');
-                
-                // Parsear CSV usando PapaParse
-                const parseResult = Papa.parse(csvContent, {
-                    header: true,
-                    skipEmptyLines: true,
-                    dynamicTyping: true,
-                    transformHeader: (header) => header.trim()
-                });
-                
-                if (parseResult.errors.length > 0) {
-                    console.warn('Advertencias al procesar CSV:', parseResult.errors);
-                }
-                
-                const shopifyData = parseResult.data;
-                const bluexData = convertShopifyToBluex(shopifyData, appConfig);
-                
-                updateProgress(70, 'Generando archivo Excel...');
-                
-                let workbook;
-                
-                if (elements.useTemplate.checked && elements.templateFile.files[0]) {
-                    // Usar plantilla oficial
-                    const templateFile = elements.templateFile.files[0];
-                    const templateBuffer = await templateFile.arrayBuffer();
-                    workbook = XLSX.read(templateBuffer, { type: 'array' });
-                    
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    
-                    // Buscar columnas en fila 5 (fila de encabezados en plantilla)
-                    const columnMapping = {};
-                    for (let col = 0; col < 50; col++) {
-                        const cellAddress = XLSX.utils.encode_cell({ r: 4, c: col });
-                        const cell = worksheet[cellAddress];
-                        if (cell && cell.v && BLUEX_COLUMNS.includes(String(cell.v).trim())) {
-                            columnMapping[String(cell.v).trim()] = col;
-                        }
-                    }
-                    
-                    // Limpiar datos existentes
-                    const startDataRow = 5;
-                    for (let row = startDataRow; row < startDataRow + Math.max(bluexData.length, 100); row++) {
-                        for (const col of Object.values(columnMapping)) {
-                            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-                            delete worksheet[cellAddress];
-                        }
-                    }
-                    
-                    // Insertar nuevos datos
-                    bluexData.forEach((record, index) => {
-                        const row = startDataRow + index;
-                        for (const [columnName, value] of Object.entries(record)) {
-                            if (columnMapping[columnName] !== undefined) {
-                                const cellAddress = XLSX.utils.encode_cell({ r: row, c: columnMapping[columnName] });
-                                worksheet[cellAddress] = { 
-                                    v: value, 
-                                    t: typeof value === 'number' ? 'n' : 's' 
-                                };
-                            }
-                        }
-                    });
-                } else {
-                    // Crear archivo nuevo
-                    const worksheet = XLSX.utils.json_to_sheet(bluexData);
-                    workbook = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(workbook, worksheet, 'Datos Bluexpress');
-                }
-                
-                updateProgress(90, 'Preparando descarga...');
-                
-                // Generar nombre de archivo con timestamp
-                const now = new Date();
-                const timestamp = now.toISOString().slice(0, 19).replace(/[:T]/g, '_').replace(/-/g, '');
-                const fileName = `bluexpress_carga_${timestamp}.xlsx`;
-                
-                // Descargar archivo
-                XLSX.writeFile(workbook, fileName);
-                
-                updateProgress(100, '¡Completado!');
-                showAlert(`¡Archivo generado exitosamente! 📊 ${fileName}`, 'success');
-                showAlert(`Se procesaron ${bluexData.length} pedidos correctamente.`, 'success');
-                
-            } catch (error) {
-                console.error('Error al generar archivo:', error);
-                showAlert(`Error al procesar el archivo: ${error.message}`, 'error');
-                resetProgress();
-            } finally {
-                // Rehabilitar botón
-                elements.generateBtn.disabled = false;
-                elements.generateBtn.classList.remove('loading');
-            }
-        }
-        
-        function saveConfiguration() {
-            try {
-                const configToSave = {
-                    valor_contenido_col: document.getElementById('valorCol').value,
-                    telefono_prefijo_pais: document.getElementById('prefijo').value,
-                    defaults: {
-                        'Tipo Entrega*': document.getElementById('tipoEntrega').value,
-                        'Garantía*': document.getElementById('garantia').value,
-                        'Tamaño*': document.getElementById('tamano').value
-                    },
-                    max_desc_len: parseInt(document.getElementById('maxDesc').value) || 180,
-                    normalize: {
-                        'Región*': parseNormalizationMapping(document.getElementById('mapRegion').value),
-                        'Comuna*': parseNormalizationMapping(document.getElementById('mapComuna').value)
-                    }
-                };
-                
-                localStorage.setItem('bluex_config', JSON.stringify(configToSave));
-                showAlert('✅ Configuración guardada correctamente en el navegador', 'success');
-            } catch (error) {
-                showAlert('❌ Error al guardar la configuración', 'error');
-                console.error('Error saving config:', error);
-            }
-        }
-        
-        function loadConfiguration() {
-            try {
-                const savedConfig = localStorage.getItem('bluex_config');
-                if (savedConfig) {
-                    const config = JSON.parse(savedConfig);
-                    
-                    // Aplicar configuración a los elementos de la interfaz
-                    document.getElementById('valorCol').value = config.valor_contenido_col || 'Subtotal';
-                    document.getElementById('prefijo').value = config.telefono_prefijo_pais || '56';
-                    document.getElementById('tipoEntrega').value = config.defaults?.['Tipo Entrega*'] || 'Domicilio';
-                    document.getElementById('garantia').value = config.defaults?.['Garantía*'] || 'No';
-                    document.getElementById('tamano').value = config.defaults?.['Tamaño*'] || 'M';
-                    document.getElementById('maxDesc').value = config.max_desc_len || 180;
-                    
-                    // Cargar mapeos de normalización
-                    const regionMapping = config.normalize?.['Región*'] || {};
-                    const cityMapping = config.normalize?.['Comuna*'] || {};
-                    
-                    const regionText = Object.entries(regionMapping)
-                        .map(([key, value]) => `${key}=${value}`)
-                        .join('\n');
-                    const cityText = Object.entries(cityMapping)
-                        .map(([key, value]) => `${key}=${value}`)
-                        .join('\n');
-                    
-                    document.getElementById('mapRegion').value = regionText;
-                    document.getElementById('mapComuna').value = cityText;
-                    
-                    showAlert('📂 Configuración cargada desde el navegador', 'success');
-                } else {
-                    // Configuración por defecto si no hay guardada
-                    showAlert('⚙️ Usando configuración por defecto', 'warning');
-                }
-            } catch (error) {
-                showAlert('❌ Error al cargar la configuración guardada', 'error');
-                console.error('Error loading config:', error);
-            }
-        }
-        
-        function resetForm() {
-            if (confirm('¿Estás seguro de que quieres reiniciar todo el formulario?')) {
-                // Limpiar archivos
-                elements.csvFile.value = '';
-                elements.templateFile.value = '';
-                elements.useTemplate.checked = false;
-                
-                // Resetear labels de archivos
-                document.querySelectorAll('.file-input-label').forEach(label => {
-                    label.classList.remove('has-file');
-                    const fileText = label.querySelector('.file-text');
-                    if (label.getAttribute('for') === 'csvFile') {
-                        fileText.textContent = 'Seleccionar archivo CSV de Shopify';
-                    } else {
-                        fileText.textContent = 'Seleccionar plantilla oficial';
-                    }
-                });
-                
-                // Ocultar grupo de plantilla
-                elements.templateGroup.classList.add('hidden');
-                
-                // Resetear configuración a valores por defecto
-                document.getElementById('valorCol').value = 'Subtotal';
-                document.getElementById('prefijo').value = '56';
-                document.getElementById('tipoEntrega').value = 'Domicilio';
-                document.getElementById('garantia').value = 'No';
-                document.getElementById('tamano').value = 'M';
-                document.getElementById('maxDesc').value = '180';
-                document.getElementById('mapRegion').value = '';
-                document.getElementById('mapComuna').value = '';
-                
-                // Limpiar alertas y progreso
-                clearAlerts();
-                resetProgress();
-                
-                showAlert('🔄 Formulario reiniciado correctamente', 'success');
-            }
-        }
-        
-        // Mensaje de bienvenida una vez que las librerías están cargadas
-        window.addEventListener('load', function() {
-            // Verificar que las librerías externas estén disponibles
-            if (typeof XLSX === 'undefined') {
-                showAlert('❌ Error: No se pudo cargar la librería de Excel. Verifica tu conexión a internet.', 'error');
-            }
-            if (typeof Papa === 'undefined') {
-                showAlert('❌ Error: No se pudo cargar la librería de CSV. Verifica tu conexión a internet.', 'error');
-            }
-        });
-    </script>
+      });
+
+      // Descargar
+      const outBuffer = await wb.xlsx.writeBuffer();
+      triggerDownload(outBuffer, outName);
+    }
+
+    function triggerDownload(buffer, filename){
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+    }
+
+    // ====== Reset ======
+    function resetForm(){
+      // CSV
+      safeResetFileInput('csvFile','Seleccionar archivo CSV de Shopify');
+      elements.csvFileInfo.classList.remove('visible');
+      // Plantilla
+      safeResetFileInput('templateFile','Seleccionar plantilla oficial');
+      elements.templateFileInfo.classList.remove('visible');
+      // Toggle
+      elements.useTemplate.checked = false;
+      elements.templateGroup.classList.add('hidden');
+      // Config
+      setUIFromConfig({
+        valor_contenido_col:'Subtotal',
+        telefono_prefijo_pais:'56',
+        defaults:{'Tipo Entrega*':'Domicilio','Garantía*':'No','Tamaño*':'M'},
+        max_desc_len:180,
+        normalize:{'Región*':{},'Comuna*':{}}
+      });
+      clearAlerts(); resetProgress();
+      showAlert('Formulario reiniciado.','info');
+    }
+    function safeResetFileInput(id, placeholder){
+      const input = document.getElementById(id);
+      if(!input) return;
+      input.value='';
+      const wrapper = input.closest('.file-input-wrapper');
+      const label = wrapper?.querySelector('.file-input-label');
+      const fileText = label?.querySelector('.file-text');
+      label?.classList.remove('has-file','processing');
+      if(fileText) fileText.textContent = placeholder;
+    }
+
+    // Enter para login
+    document.getElementById('accessPassword').addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ e.preventDefault(); authenticate(); }
+    });
+  </script>
 </body>
 </html>
