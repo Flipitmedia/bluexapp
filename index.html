@@ -1165,7 +1165,14 @@
             elements.accessPassword.value = '';
             clearAlerts();
             resetProgress();
+            
+            // Limpiar el workbook de plantilla almacenado
+            originalTemplateWorkbook = null;
         }
+        
+        // Hacer las funciones globales para que funcionen con onclick
+        window.logout = logout;
+        window.resetForm = resetForm;
         
         function checkAuthentication() {
             const isAuthenticated = sessionStorage.getItem(SESSION_KEY) === 'true';
