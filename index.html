@@ -271,6 +271,51 @@
             opacity: 0.6;
         }
         
+        /* Nueva clase para el estado de procesamiento */
+        .file-input-label.processing {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%);
+            border-color: var(--warning);
+            color: #856404;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        /* Información del archivo cargado */
+        .file-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+        
+        .file-info.visible {
+            display: block;
+        }
+        
+        .file-info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.9rem;
+        }
+        
+        .file-info-label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .file-info-value {
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
         .checkbox-wrapper {
             display: flex;
             align-items: center;
@@ -440,6 +485,12 @@
             background: #fff3cd;
             color: #856404;
             border-color: var(--warning);
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-color: #bee5eb;
         }
         
         .button-group {
@@ -624,12 +675,26 @@
                                     <span class="file-text">Seleccionar archivo CSV de Shopify</span>
                                     <small>Arrastra el archivo aquí o haz clic para seleccionar</small>
                                 </label>
+                                <div class="file-info" id="csvFileInfo">
+                                    <div class="file-info-item">
+                                        <span class="file-info-label">Nombre:</span>
+                                        <span class="file-info-value" id="csvFileName">-</span>
+                                    </div>
+                                    <div class="file-info-item">
+                                        <span class="file-info-label">Tamaño:</span>
+                                        <span class="file-info-value" id="csvFileSize">-</span>
+                                    </div>
+                                    <div class="file-info-item">
+                                        <span class="file-info-label">Filas detectadas:</span>
+                                        <span class="file-info-value" id="csvRowCount">-</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
                         <div class="checkbox-wrapper">
                             <input type="checkbox" id="useTemplate">
-                            <label for="useTemplate">📋 Usar plantilla oficial de Bluexpress (opcional)</label>
+                            <label for="useTemplate">📋 Usar plantilla oficial de Bluexpress (opcional - preserva formato exacto)</label>
                         </div>
                         
                         <div class="form-group hidden" id="templateGroup">
@@ -641,6 +706,20 @@
                                     <span class="file-text">Seleccionar plantilla oficial</span>
                                     <small>Archivo .xlsx descargado de Bluexpress</small>
                                 </label>
+                                <div class="file-info" id="templateFileInfo">
+                                    <div class="file-info-item">
+                                        <span class="file-info-label">Nombre:</span>
+                                        <span class="file-info-value" id="templateFileName">-</span>
+                                    </div>
+                                    <div class="file-info-item">
+                                        <span class="file-info-label">Tamaño:</span>
+                                        <span class="file-info-value" id="templateFileSize">-</span>
+                                    </div>
+                                    <div class="file-info-item">
+                                        <span class="file-info-label">Estado:</span>
+                                        <span class="file-info-value" id="templateStatus">-</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -773,6 +852,9 @@
             }
         };
         
+        // Variable para almacenar la plantilla original
+        let originalTemplateWorkbook = null;
+        
         // Columnas del formato Bluexpress
         const BLUEX_COLUMNS = [
             "N°", "Nombre*", "Apellido*", "Telefono*", "Correo*", "Tipo Entrega*",
@@ -809,7 +891,9 @@
                 alerts: document.getElementById('alerts'),
                 progressContainer: document.getElementById('progressContainer'),
                 progressBar: document.getElementById('progressBar'),
-                progressText: document.getElementById('progressText')
+                progressText: document.getElementById('progressText'),
+                csvFileInfo: document.getElementById('csvFileInfo'),
+                templateFileInfo: document.getElementById('templateFileInfo')
             };
         }
         
@@ -820,8 +904,8 @@
             });
             
             // Archivos
-            elements.csvFile.addEventListener('change', handleFileSelect);
-            elements.templateFile.addEventListener('change', handleFileSelect);
+            elements.csvFile.addEventListener('change', handleCSVFileSelect);
+            elements.templateFile.addEventListener('change', handleTemplateFileSelect);
             elements.useTemplate.addEventListener('change', toggleTemplate);
             
             // Botones principales
@@ -875,7 +959,183 @@
             
             if (files.length > 0) {
                 fileInput.files = files;
-                handleFileSelect({ target: fileInput });
+                if (fileInput.id === 'csvFile') {
+                    handleCSVFileSelect({ target: fileInput });
+                } else {
+                    handleTemplateFileSelect({ target: fileInput });
+                }
+            }
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+        
+        async function handleCSVFileSelect(e) {
+            const file = e.target.files[0];
+            const label = document.querySelector(`label[for="${e.target.id}"]`);
+            const fileText = label.querySelector('.file-text');
+            
+            if (file) {
+                // Mostrar estado de procesamiento
+                label.classList.add('processing');
+                fileText.textContent = '⏳ Procesando archivo...';
+                
+                try {
+                    // Validar tipo de archivo
+                    if (!file.name.toLowerCase().endsWith('.csv')) {
+                        showAlert('Por favor selecciona un archivo CSV válido.', 'warning');
+                        label.classList.remove('processing');
+                        label.classList.remove('has-file');
+                        fileText.textContent = 'Seleccionar archivo CSV de Shopify';
+                        return;
+                    }
+                    
+                    // Leer y analizar el archivo
+                    const content = await file.text();
+                    const parseResult = Papa.parse(content, {
+                        header: true,
+                        skipEmptyLines: true,
+                        preview: 10 // Solo previsualizar las primeras 10 filas para el conteo
+                    });
+                    
+                    // Contar filas totales
+                    const fullParseResult = Papa.parse(content, {
+                        header: true,
+                        skipEmptyLines: true
+                    });
+                    
+                    const rowCount = fullParseResult.data.length;
+                    
+                    // Actualizar información del archivo
+                    document.getElementById('csvFileName').textContent = file.name;
+                    document.getElementById('csvFileSize').textContent = formatFileSize(file.size);
+                    document.getElementById('csvRowCount').textContent = `${rowCount} pedidos`;
+                    
+                    // Mostrar panel de información
+                    elements.csvFileInfo.classList.add('visible');
+                    
+                    // Actualizar estado visual
+                    setTimeout(() => {
+                        label.classList.remove('processing');
+                        label.classList.add('has-file');
+                        fileText.innerHTML = `<strong>✅ ${file.name}</strong>`;
+                        
+                        showAlert(`Archivo CSV cargado correctamente: ${rowCount} registros encontrados`, 'success');
+                    }, 500);
+                    
+                } catch (error) {
+                    console.error('Error al procesar CSV:', error);
+                    showAlert('Error al procesar el archivo CSV', 'error');
+                    label.classList.remove('processing');
+                    label.classList.remove('has-file');
+                    fileText.textContent = 'Seleccionar archivo CSV de Shopify';
+                }
+            } else {
+                fileText.textContent = 'Seleccionar archivo CSV de Shopify';
+                label.classList.remove('has-file');
+                label.classList.remove('processing');
+                elements.csvFileInfo.classList.remove('visible');
+            }
+        }
+        
+        async function handleTemplateFileSelect(e) {
+            const file = e.target.files[0];
+            const label = document.querySelector(`label[for="${e.target.id}"]`);
+            const fileText = label.querySelector('.file-text');
+            
+            if (file) {
+                // Mostrar estado de procesamiento
+                label.classList.add('processing');
+                fileText.textContent = '⏳ Analizando plantilla...';
+                
+                try {
+                    // Validar tipo de archivo
+                    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+                        showAlert('Por favor selecciona un archivo Excel (.xlsx) válido.', 'warning');
+                        label.classList.remove('processing');
+                        label.classList.remove('has-file');
+                        fileText.textContent = 'Seleccionar plantilla oficial';
+                        return;
+                    }
+                    
+                    // Leer y analizar la plantilla
+                    const arrayBuffer = await file.arrayBuffer();
+                    const workbook = XLSX.read(arrayBuffer, { 
+                        type: 'array',
+                        cellStyles: true,
+                        cellFormulas: true,
+                        cellDates: true,
+                        cellNF: true,
+                        sheetStubs: true
+                    });
+                    
+                    // Guardar la plantilla original completa
+                    originalTemplateWorkbook = workbook;
+                    
+                    // Verificar que tiene las columnas esperadas
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    let hasRequiredColumns = false;
+                    
+                    // Buscar las columnas requeridas en las primeras 10 filas
+                    for (let row = 0; row < 10; row++) {
+                        let foundColumns = 0;
+                        for (let col = 0; col < 30; col++) {
+                            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+                            const cell = worksheet[cellAddress];
+                            if (cell && cell.v) {
+                                const value = String(cell.v).trim();
+                                if (BLUEX_COLUMNS.includes(value)) {
+                                    foundColumns++;
+                                }
+                            }
+                        }
+                        if (foundColumns >= 10) {
+                            hasRequiredColumns = true;
+                            break;
+                        }
+                    }
+                    
+                    // Actualizar información del archivo
+                    document.getElementById('templateFileName').textContent = file.name;
+                    document.getElementById('templateFileSize').textContent = formatFileSize(file.size);
+                    document.getElementById('templateStatus').textContent = hasRequiredColumns ? 
+                        '✅ Plantilla válida' : '⚠️ Verificar formato';
+                    
+                    // Mostrar panel de información
+                    elements.templateFileInfo.classList.add('visible');
+                    
+                    // Actualizar estado visual
+                    setTimeout(() => {
+                        label.classList.remove('processing');
+                        label.classList.add('has-file');
+                        fileText.innerHTML = `<strong>✅ ${file.name}</strong>`;
+                        
+                        if (hasRequiredColumns) {
+                            showAlert('Plantilla de Bluexpress cargada correctamente. El formato será preservado íntegramente.', 'success');
+                        } else {
+                            showAlert('Plantilla cargada. Advertencia: No se detectaron todas las columnas esperadas.', 'warning');
+                        }
+                    }, 500);
+                    
+                } catch (error) {
+                    console.error('Error al procesar plantilla:', error);
+                    showAlert('Error al procesar la plantilla Excel', 'error');
+                    label.classList.remove('processing');
+                    label.classList.remove('has-file');
+                    fileText.textContent = 'Seleccionar plantilla oficial';
+                    originalTemplateWorkbook = null;
+                }
+            } else {
+                fileText.textContent = 'Seleccionar plantilla oficial';
+                label.classList.remove('has-file');
+                label.classList.remove('processing');
+                elements.templateFileInfo.classList.remove('visible');
+                originalTemplateWorkbook = null;
             }
         }
         
@@ -916,41 +1176,21 @@
             }
         }
         
-        function handleFileSelect(e) {
-            const file = e.target.files[0];
-            const label = document.querySelector(`label[for="${e.target.id}"]`);
-            const fileText = label.querySelector('.file-text');
-            
-            if (file) {
-                fileText.textContent = `✅ ${file.name}`;
-                label.classList.add('has-file');
-                
-                // Validar tipo de archivo
-                if (e.target.id === 'csvFile' && !file.name.toLowerCase().endsWith('.csv')) {
-                    showAlert('Por favor selecciona un archivo CSV válido.', 'warning');
-                }
-                if (e.target.id === 'templateFile' && !file.name.toLowerCase().endsWith('.xlsx')) {
-                    showAlert('Por favor selecciona un archivo Excel (.xlsx) válido.', 'warning');
-                }
-            } else {
-                const defaultText = e.target.id === 'csvFile' ? 
-                    'Seleccionar archivo CSV de Shopify' : 
-                    'Seleccionar plantilla oficial';
-                fileText.textContent = defaultText;
-                label.classList.remove('has-file');
-            }
-        }
-        
         function toggleTemplate() {
             const isChecked = elements.useTemplate.checked;
             elements.templateGroup.classList.toggle('hidden', !isChecked);
+            
+            if (isChecked) {
+                showAlert('📋 Al usar la plantilla oficial, se preservará íntegramente su formato, estilos y fórmulas.', 'info');
+            }
         }
         
         function showAlert(message, type = 'success') {
             const alert = document.createElement('div');
             alert.className = `alert alert-${type}`;
+            const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
             alert.innerHTML = `
-                <strong>${type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️'}</strong>
+                <strong>${icon}</strong>
                 ${message}
             `;
             
@@ -1222,46 +1462,87 @@
                 
                 let workbook;
                 
-                if (elements.useTemplate.checked && elements.templateFile.files[0]) {
-                    // Usar plantilla oficial
-                    const templateFile = elements.templateFile.files[0];
-                    const templateBuffer = await templateFile.arrayBuffer();
-                    workbook = XLSX.read(templateBuffer, { type: 'array' });
+                if (elements.useTemplate.checked && originalTemplateWorkbook) {
+                    // Usar plantilla oficial preservando TODO el formato
+                    updateProgress(75, 'Preservando formato de plantilla original...');
                     
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    // Clonar el workbook original para preservar todo
+                    workbook = XLSX.utils.book_new();
                     
-                    // Buscar columnas en fila 5 (fila de encabezados en plantilla)
-                    const columnMapping = {};
-                    for (let col = 0; col < 50; col++) {
-                        const cellAddress = XLSX.utils.encode_cell({ r: 4, c: col });
-                        const cell = worksheet[cellAddress];
-                        if (cell && cell.v && BLUEX_COLUMNS.includes(String(cell.v).trim())) {
-                            columnMapping[String(cell.v).trim()] = col;
-                        }
-                    }
-                    
-                    // Limpiar datos existentes
-                    const startDataRow = 5;
-                    for (let row = startDataRow; row < startDataRow + Math.max(bluexData.length, 100); row++) {
-                        for (const col of Object.values(columnMapping)) {
-                            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-                            delete worksheet[cellAddress];
-                        }
-                    }
-                    
-                    // Insertar nuevos datos
-                    bluexData.forEach((record, index) => {
-                        const row = startDataRow + index;
-                        for (const [columnName, value] of Object.entries(record)) {
-                            if (columnMapping[columnName] !== undefined) {
-                                const cellAddress = XLSX.utils.encode_cell({ r: row, c: columnMapping[columnName] });
-                                worksheet[cellAddress] = { 
-                                    v: value, 
-                                    t: typeof value === 'number' ? 'n' : 's' 
-                                };
+                    // Copiar todas las hojas con sus formatos
+                    for (const sheetName of originalTemplateWorkbook.SheetNames) {
+                        const originalSheet = originalTemplateWorkbook.Sheets[sheetName];
+                        
+                        // Crear una copia profunda de la hoja
+                        const newSheet = JSON.parse(JSON.stringify(originalSheet));
+                        
+                        // Si es la primera hoja, insertar los datos
+                        if (sheetName === originalTemplateWorkbook.SheetNames[0]) {
+                            // Buscar columnas en fila 5 (fila de encabezados en plantilla)
+                            const columnMapping = {};
+                            for (let col = 0; col < 50; col++) {
+                                const cellAddress = XLSX.utils.encode_cell({ r: 4, c: col });
+                                const cell = newSheet[cellAddress];
+                                if (cell && cell.v && BLUEX_COLUMNS.includes(String(cell.v).trim())) {
+                                    columnMapping[String(cell.v).trim()] = col;
+                                }
                             }
+                            
+                            // Encontrar la fila de inicio de datos
+                            const startDataRow = 5;
+                            
+                            // Limpiar solo las celdas de datos (preservando formato)
+                            for (let row = startDataRow; row < startDataRow + 1000; row++) {
+                                for (const col of Object.values(columnMapping)) {
+                                    const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+                                    if (newSheet[cellAddress]) {
+                                        // Preservar el formato pero limpiar el valor
+                                        const originalCell = newSheet[cellAddress];
+                                        newSheet[cellAddress] = {
+                                            s: originalCell.s, // Preservar estilo
+                                            z: originalCell.z, // Preservar formato de número
+                                            v: '', // Limpiar valor
+                                            t: 's' // Tipo string por defecto
+                                        };
+                                    }
+                                }
+                            }
+                            
+                            // Insertar nuevos datos preservando formatos
+                            bluexData.forEach((record, index) => {
+                                const row = startDataRow + index;
+                                for (const [columnName, value] of Object.entries(record)) {
+                                    if (columnMapping[columnName] !== undefined) {
+                                        const cellAddress = XLSX.utils.encode_cell({ r: row, c: columnMapping[columnName] });
+                                        
+                                        // Obtener celda original para preservar formato
+                                        const originalCell = newSheet[cellAddress] || {};
+                                        
+                                        // Crear nueva celda preservando formato original
+                                        newSheet[cellAddress] = {
+                                            v: value,
+                                            t: typeof value === 'number' ? 'n' : 's',
+                                            s: originalCell.s, // Preservar estilo
+                                            z: originalCell.z  // Preservar formato de número
+                                        };
+                                    }
+                                }
+                            });
                         }
-                    });
+                        
+                        XLSX.utils.book_append_sheet(workbook, newSheet, sheetName);
+                    }
+                    
+                    // Copiar propiedades del workbook original
+                    if (originalTemplateWorkbook.Props) {
+                        workbook.Props = originalTemplateWorkbook.Props;
+                    }
+                    if (originalTemplateWorkbook.Custprops) {
+                        workbook.Custprops = originalTemplateWorkbook.Custprops;
+                    }
+                    
+                    showAlert('📋 Formato de plantilla preservado íntegramente', 'info');
+                    
                 } else {
                     // Crear archivo nuevo
                     const worksheet = XLSX.utils.json_to_sheet(bluexData);
@@ -1276,8 +1557,13 @@
                 const timestamp = now.toISOString().slice(0, 19).replace(/[:T]/g, '_').replace(/-/g, '');
                 const fileName = `bluexpress_carga_${timestamp}.xlsx`;
                 
-                // Descargar archivo
-                XLSX.writeFile(workbook, fileName);
+                // Descargar archivo con opciones para preservar formato
+                XLSX.writeFile(workbook, fileName, {
+                    bookType: 'xlsx',
+                    bookSST: true,
+                    cellStyles: true,
+                    cellDates: true
+                });
                 
                 updateProgress(100, '¡Completado!');
                 showAlert(`¡Archivo generado exitosamente! 📊 ${fileName}`, 'success');
@@ -1293,120 +1579,3 @@
                 elements.generateBtn.classList.remove('loading');
             }
         }
-        
-        function saveConfiguration() {
-            try {
-                const configToSave = {
-                    valor_contenido_col: document.getElementById('valorCol').value,
-                    telefono_prefijo_pais: document.getElementById('prefijo').value,
-                    defaults: {
-                        'Tipo Entrega*': document.getElementById('tipoEntrega').value,
-                        'Garantía*': document.getElementById('garantia').value,
-                        'Tamaño*': document.getElementById('tamano').value
-                    },
-                    max_desc_len: parseInt(document.getElementById('maxDesc').value) || 180,
-                    normalize: {
-                        'Región*': parseNormalizationMapping(document.getElementById('mapRegion').value),
-                        'Comuna*': parseNormalizationMapping(document.getElementById('mapComuna').value)
-                    }
-                };
-                
-                localStorage.setItem('bluex_config', JSON.stringify(configToSave));
-                showAlert('✅ Configuración guardada correctamente en el navegador', 'success');
-            } catch (error) {
-                showAlert('❌ Error al guardar la configuración', 'error');
-                console.error('Error saving config:', error);
-            }
-        }
-        
-        function loadConfiguration() {
-            try {
-                const savedConfig = localStorage.getItem('bluex_config');
-                if (savedConfig) {
-                    const config = JSON.parse(savedConfig);
-                    
-                    // Aplicar configuración a los elementos de la interfaz
-                    document.getElementById('valorCol').value = config.valor_contenido_col || 'Subtotal';
-                    document.getElementById('prefijo').value = config.telefono_prefijo_pais || '56';
-                    document.getElementById('tipoEntrega').value = config.defaults?.['Tipo Entrega*'] || 'Domicilio';
-                    document.getElementById('garantia').value = config.defaults?.['Garantía*'] || 'No';
-                    document.getElementById('tamano').value = config.defaults?.['Tamaño*'] || 'M';
-                    document.getElementById('maxDesc').value = config.max_desc_len || 180;
-                    
-                    // Cargar mapeos de normalización
-                    const regionMapping = config.normalize?.['Región*'] || {};
-                    const cityMapping = config.normalize?.['Comuna*'] || {};
-                    
-                    const regionText = Object.entries(regionMapping)
-                        .map(([key, value]) => `${key}=${value}`)
-                        .join('\n');
-                    const cityText = Object.entries(cityMapping)
-                        .map(([key, value]) => `${key}=${value}`)
-                        .join('\n');
-                    
-                    document.getElementById('mapRegion').value = regionText;
-                    document.getElementById('mapComuna').value = cityText;
-                    
-                    showAlert('📂 Configuración cargada desde el navegador', 'success');
-                } else {
-                    // Configuración por defecto si no hay guardada
-                    showAlert('⚙️ Usando configuración por defecto', 'warning');
-                }
-            } catch (error) {
-                showAlert('❌ Error al cargar la configuración guardada', 'error');
-                console.error('Error loading config:', error);
-            }
-        }
-        
-        function resetForm() {
-            if (confirm('¿Estás seguro de que quieres reiniciar todo el formulario?')) {
-                // Limpiar archivos
-                elements.csvFile.value = '';
-                elements.templateFile.value = '';
-                elements.useTemplate.checked = false;
-                
-                // Resetear labels de archivos
-                document.querySelectorAll('.file-input-label').forEach(label => {
-                    label.classList.remove('has-file');
-                    const fileText = label.querySelector('.file-text');
-                    if (label.getAttribute('for') === 'csvFile') {
-                        fileText.textContent = 'Seleccionar archivo CSV de Shopify';
-                    } else {
-                        fileText.textContent = 'Seleccionar plantilla oficial';
-                    }
-                });
-                
-                // Ocultar grupo de plantilla
-                elements.templateGroup.classList.add('hidden');
-                
-                // Resetear configuración a valores por defecto
-                document.getElementById('valorCol').value = 'Subtotal';
-                document.getElementById('prefijo').value = '56';
-                document.getElementById('tipoEntrega').value = 'Domicilio';
-                document.getElementById('garantia').value = 'No';
-                document.getElementById('tamano').value = 'M';
-                document.getElementById('maxDesc').value = '180';
-                document.getElementById('mapRegion').value = '';
-                document.getElementById('mapComuna').value = '';
-                
-                // Limpiar alertas y progreso
-                clearAlerts();
-                resetProgress();
-                
-                showAlert('🔄 Formulario reiniciado correctamente', 'success');
-            }
-        }
-        
-        // Mensaje de bienvenida una vez que las librerías están cargadas
-        window.addEventListener('load', function() {
-            // Verificar que las librerías externas estén disponibles
-            if (typeof XLSX === 'undefined') {
-                showAlert('❌ Error: No se pudo cargar la librería de Excel. Verifica tu conexión a internet.', 'error');
-            }
-            if (typeof Papa === 'undefined') {
-                showAlert('❌ Error: No se pudo cargar la librería de CSV. Verifica tu conexión a internet.', 'error');
-            }
-        });
-    </script>
-</body>
-</html>
